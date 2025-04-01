@@ -1,46 +1,51 @@
-// index.tsx
-import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, TextInput, StyleSheet, Text } from 'react-native';
+import CustomButton from './CustomButton';
 import { useAuth } from '../context/AuthContext';
 import { useRouter } from 'expo-router';
-import CustomButton from '../components/CustomButton';  // Asegúrate de la ruta correcta
 
-export default function Index() {
+export default function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
   const { login, user } = useAuth();
   const router = useRouter();
 
   const handleLogin = async () => {
+    setLoading(true);
     try {
-      const response = await login(email, password);
-      if (user?.role) {
-        switch (user.role) {
-          case 'mesero':
-            router.push('/mesero');
-            break;
-          case 'caja':
-            router.push('/caja');
-            break;
-          case 'cocina':
-            router.push('/cocinero');
-            break;
-          case 'admin':
-            router.push('/admin');
-            break;
-          default:
-            console.log('No se ha encontrado un rol para el usuario.');
-            break;
-        }
-      }
+      await login(email, password);
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('Error en el login:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
+  useEffect(() => {
+    if (!loading && user && user.role) {
+      switch (user.role) {
+        case 'mesero':
+          router.push('../app/mesero');
+          break;
+        case 'caja':
+          router.push('../app/caja');
+          break;
+        case 'cocina':
+          router.push('../app/cocinero');
+          break;
+        case 'admin':
+          router.push('../app/admin');
+          break;
+        default:
+          router.push('../app/index');
+          break;
+      }
+    }
+  }, [user, loading, router]); // Asegura que la redirección solo ocurra cuando no esté cargando
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>TO DO (NAME)</Text>
       <TextInput
         style={styles.input}
         placeholder="Email"
@@ -58,9 +63,8 @@ export default function Index() {
         value={password}
         onChangeText={setPassword}
       />
-      {/* Uso del CustomButton */}
       <CustomButton onPress={handleLogin} title="Log in" />
-      <Text style={styles.linkText}>Need a new account? Sign Up!</Text>
+      <Text style={styles.linkText}>¿Necesitas crear una cuenta? Regístrate!</Text>
     </View>
   );
 }
@@ -71,12 +75,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-  },
-  title: {
-    color: '#347FC2',
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: '6%',
   },
   input: {
     textAlign: 'center',
