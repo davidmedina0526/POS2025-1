@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import { useMenu } from '../context/MenuContext';
 import { MenuItem } from '../interfaces/MenuItem';
 import * as ImagePicker from 'expo-image-picker';
-import CustomButton from '../components/CustomButton';
-import { StyleSheet } from 'react-native';
+import { supabase } from '../utils/supabaseClient'; // Importa el cliente de Supabase
 
 const AddDishForm = () => {
   const { addMenuItem } = useMenu();
@@ -12,11 +11,47 @@ const AddDishForm = () => {
     description: '',
     price: 0,
     category: 'entrada',
-    imageUrl: ''
+    imageUrl: ''  // Permitir null aquí
   });
   const [showImageOptions, setShowImageOptions] = useState(false);
 
-  // Función para solicitar permisos y lanzar la cámara o la galería
+  // Función para subir la imagen a Supabase y obtener la URL
+  const uploadImage = async (uri: string) => {
+    const fileExt = uri.split('.').pop(); // Obtén la extensión del archivo
+    const fileName = `${new Date().getTime()}.${fileExt}`;
+
+    // Convertir el URI a un objeto Blob
+    const response = await fetch(uri);
+    const blob = await response.blob(); // Convierte el URI a un Blob
+
+    // Subir el Blob a Supabase
+    const { data, error } = await supabase.storage
+      .from('menu-images')  // Nombre del bucket en Supabase
+      .upload(fileName, blob, {
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    if (error) {
+      console.error('Error al subir la imagen:', error);
+      return null;
+    }
+
+    // Obtener la URL pública de la imagen
+    const { data: publicUrlData, error: urlError } = supabase.storage
+      .from('menu-images')
+      .getPublicUrl(data.path);
+
+    if (urlError) {
+      console.error('Error al obtener la URL de la imagen:', urlError);
+      return null;
+    }
+
+    // Retornar la URL pública
+    return publicUrlData.publicUrl;
+  };
+
+  // Función para manejar la selección de imagen
   const handlePickImage = async (fromCamera: boolean) => {
     let permissionResult;
     if (fromCamera) {
@@ -33,7 +68,8 @@ const AddDishForm = () => {
       });
       if (!result.canceled) {
         if (result.assets && result.assets.length > 0) {
-          setNewDish({ ...newDish, imageUrl: result.assets[0].uri });
+          const imageUrl = await uploadImage(result.assets[0].uri);
+          setNewDish({ ...newDish, imageUrl });
         }
       }
     } else {
@@ -50,7 +86,8 @@ const AddDishForm = () => {
       });
       if (!result.canceled) {
         if (result.assets && result.assets.length > 0) {
-          setNewDish({ ...newDish, imageUrl: result.assets[0].uri });
+          const imageUrl = await uploadImage(result.assets[0].uri);
+          setNewDish({ ...newDish, imageUrl });
         }
       }
     }
@@ -59,14 +96,15 @@ const AddDishForm = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Asegúrate de no guardar null en Firestore
     await addMenuItem({
       name: newDish.name,
       description: newDish.description,
       price: newDish.price,
       category: newDish.category,
-      imageUrl: newDish.imageUrl || undefined
+      imageUrl: newDish.imageUrl || undefined // Aquí tratamos null como undefined
     });
-    setNewDish({ name: '', description: '', price: 0, category: 'entrada', imageUrl: '' });
+    setNewDish({ name: '', description: '', price: 0, category: 'entrada', imageUrl: null });
   };
 
   return (
@@ -105,9 +143,9 @@ const AddDishForm = () => {
       </select>
       
       {/* Botón para seleccionar imagen */}
-      <CustomButton type="button" onClick={() => setShowImageOptions(!showImageOptions)}>
+      <button type="button" onClick={() => setShowImageOptions(!showImageOptions)}>
         {newDish.imageUrl ? 'Cambiar imagen' : 'Subir imagen'}
-      </CustomButton>
+      </button>
       
       {/* Menú de opciones para subir imagen */}
       {showImageOptions && (
@@ -132,9 +170,5 @@ const AddDishForm = () => {
     </form>
   );
 };
-
-const styles = StyleSheet.create({
-  
-});
 
 export default AddDishForm;
