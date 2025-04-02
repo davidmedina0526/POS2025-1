@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useMenu } from '../context/MenuContext';
 import { MenuItem } from '../interfaces/MenuItem';
 import * as ImagePicker from 'expo-image-picker';
+import CustomButton from '../components/CustomButton';
+import { StyleSheet } from 'react-native';
 
 const AddDishForm = () => {
   const { addMenuItem } = useMenu();
@@ -103,9 +105,9 @@ const AddDishForm = () => {
       </select>
       
       {/* Botón para seleccionar imagen */}
-      <button type="button" onClick={() => setShowImageOptions(!showImageOptions)}>
+      <CustomButton type="button" onClick={() => setShowImageOptions(!showImageOptions)}>
         {newDish.imageUrl ? 'Cambiar imagen' : 'Subir imagen'}
-      </button>
+      </CustomButton>
       
       {/* Menú de opciones para subir imagen */}
       {showImageOptions && (
@@ -130,5 +132,9 @@ const AddDishForm = () => {
     </form>
   );
 };
+
+const styles = StyleSheet.create({
+  
+});
 
 export default AddDishForm;

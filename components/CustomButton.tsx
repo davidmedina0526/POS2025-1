@@ -6,6 +6,8 @@ interface ButtonProps {
   onPress: () => void;
   title: string;
   style?: ViewStyle;
+  children?: React.ReactNode;
+  type?: string;
 }
 
 export default function CustomButton({ onPress, title, style }: ButtonProps) {
