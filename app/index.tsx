@@ -13,9 +13,9 @@ export default function Index() {
 
   const handleLogin = async () => {
     try {
-      const response = await login(email, password);
-      if (user?.role) {
-        switch (user.role) {
+      const loggedUser = await login(email, password);
+      if (loggedUser?.role) {
+        switch (loggedUser.role) {
           case 'mesero':
             router.push('/mesero');
             break;
@@ -36,7 +36,7 @@ export default function Index() {
     } catch (error) {
       console.error('Login error:', error);
     }
-  };
+  };  
 
   return (
     <View style={styles.container}>

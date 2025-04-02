@@ -10,6 +10,8 @@ export default function RootLayout() {
         <Stack.Screen name = "caja" options = {{ title: "Cashier", headerShown: false }} />
         <Stack.Screen name = "cocinero" options = {{ title: "Chef", headerShown: false }} />
         <Stack.Screen name = "admin" options = {{ title: "Admin", headerShown: false }} />
+        <Stack.Screen name = "menu" options = {{ title: "Menu", headerShown: false }} />
+        <Stack.Screen name = "personal" options = {{ title: "Personal", headerShown: false }} />
       </Stack>
     </AuthProvider>
   )

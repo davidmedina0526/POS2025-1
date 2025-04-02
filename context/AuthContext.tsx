@@ -5,8 +5,8 @@ import { collection, addDoc, doc, getDoc, setDoc } from 'firebase/firestore';
 
 // Definir los tipos de datos para el contexto
 interface AuthContextType {
-  user: any; // Puedes ser más específico aquí dependiendo de lo que manejes de usuario
-  login: (email: string, password: string) => Promise<void>;
+  user: any;
+  login: (email: string, password: string) => Promise<any>; // Cambiado de Promise<void> a Promise<any>
   register: (email: string, password: string, role: 'caja' | 'mesero' | 'cocina' | 'admin') => Promise<void>;
   logout: () => void;
 }
@@ -31,8 +31,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
       if (userDoc.exists()) {
         const userData = userDoc.data();
-        // Actualiza el estado con el usuario y su rol
-        setUser({ ...userCredential.user, role: userData.role });
+        const loggedUser = { ...userCredential.user, role: userData.role };
+        setUser(loggedUser);
+        return loggedUser; // Retornamos el usuario con rol
       } else {
         throw new Error('No se encontró la información del rol para este usuario.');
       }
@@ -40,8 +41,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.error('Error de login:', error);
       throw new Error('Error de login');
     }
-  };
-  
+  };  
 
   // Función de register
   const register = async (email: string, password: string, role: 'caja' | 'mesero' | 'cocina' | 'admin') => {

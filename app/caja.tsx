@@ -1,18 +1,30 @@
-// /screens/caja.tsx
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { useRouter } from 'expo-router';
 
 export default function CajaScreen() {
   const { user } = useAuth();
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    if (!user || user.role !== 'caja') {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (mounted && (!user || user.role !== 'caja')) {
       router.replace('./index');
     }
-  }, [user]);
+  }, [user, mounted]);
+
+  if (!mounted || !user) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#347FC2" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -24,14 +36,14 @@ export default function CajaScreen() {
 
 const styles = StyleSheet.create({
   container: { 
-    flex: 1, 
+    flex: 1,
     justifyContent: 'center', 
     alignItems: 'center', 
     backgroundColor: '#FFFFFF'
   },
   title: { 
     color: '#347FC2',
-    fontSize: 24, 
+    fontSize: 24,
     fontWeight: 'bold',
     marginBottom: '6%',
   },
