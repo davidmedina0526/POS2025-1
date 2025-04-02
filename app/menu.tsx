@@ -1,51 +1,134 @@
-// app/menu.tsx
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
-import { useAuth } from '../context/AuthContext';
-import { useRouter } from 'expo-router';
+import React, { useState } from 'react';
+import { useMenu } from '../context/MenuContext';
+import { MenuItem } from '../interfaces/MenuItem';
+import * as ImagePicker from 'expo-image-picker';
 
-export default function MenuScreen() {
-  const { user } = useAuth();
-  const router = useRouter();
-  const [mounted, setMounted] = useState(false);
+const AddDishForm = () => {
+  const { addMenuItem } = useMenu();
+  const [newDish, setNewDish] = useState<Omit<MenuItem, 'id'>>({
+    name: '',
+    description: '',
+    price: 0,
+    category: 'entrada',
+    imageUrl: ''
+  });
+  const [showImageOptions, setShowImageOptions] = useState(false);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (mounted && (!user || user.role !== 'admin')) {
-      router.replace('./index'); // Usamos ruta absoluta
+  // Función para solicitar permisos y lanzar la cámara o la galería
+  const handlePickImage = async (fromCamera: boolean) => {
+    let permissionResult;
+    if (fromCamera) {
+      // Solicitar permisos para la cámara
+      permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+      if (permissionResult.status !== 'granted') {
+        alert('Permiso de cámara denegado');
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 1,
+      });
+      if (!result.canceled) {
+        if (result.assets && result.assets.length > 0) {
+          setNewDish({ ...newDish, imageUrl: result.assets[0].uri });
+        }
+      }
+    } else {
+      // Solicitar permisos para la galería
+      permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (permissionResult.status !== 'granted') {
+        alert('Permiso para acceder a la galería denegado');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 1,
+      });
+      if (!result.canceled) {
+        if (result.assets && result.assets.length > 0) {
+          setNewDish({ ...newDish, imageUrl: result.assets[0].uri });
+        }
+      }
     }
-  }, [user, mounted]);
+    setShowImageOptions(false);
+  };
 
-  if (!mounted || !user) {
-    return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#347FC2" />
-      </View>
-    );
-  }
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await addMenuItem({
+      name: newDish.name,
+      description: newDish.description,
+      price: newDish.price,
+      category: newDish.category,
+      imageUrl: newDish.imageUrl || undefined
+    });
+    setNewDish({ name: '', description: '', price: 0, category: 'entrada', imageUrl: '' });
+  };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Menú Admin</Text>
-      {/* Aquí agrega el contenido del menú */}
-    </View>
+    <form onSubmit={handleSubmit}>
+      <h3>Agregar Nuevo Plato</h3>
+      <input 
+        type="text" 
+        placeholder="Nombre del plato" 
+        value={newDish.name} 
+        onChange={e => setNewDish({ ...newDish, name: e.target.value })} 
+        required 
+      />
+      <input 
+        type="text" 
+        placeholder="Descripción" 
+        value={newDish.description} 
+        onChange={e => setNewDish({ ...newDish, description: e.target.value })} 
+        required 
+      />
+      <input 
+        type="number" 
+        placeholder="Precio" 
+        value={newDish.price} 
+        onChange={e => setNewDish({ ...newDish, price: Number(e.target.value) })} 
+        required 
+      />
+      <select 
+        value={newDish.category} 
+        onChange={e => setNewDish({ ...newDish, category: e.target.value as 'entrada' | 'plato principal' | 'postre' | 'bebida' })} 
+        required
+      >
+        <option value="entrada">Entrada</option>
+        <option value="plato principal">Plato Principal</option>
+        <option value="postre">Postre</option>
+        <option value="bebida">Bebida</option>
+      </select>
+      
+      {/* Botón para seleccionar imagen */}
+      <button type="button" onClick={() => setShowImageOptions(!showImageOptions)}>
+        {newDish.imageUrl ? 'Cambiar imagen' : 'Subir imagen'}
+      </button>
+      
+      {/* Menú de opciones para subir imagen */}
+      {showImageOptions && (
+        <div>
+          <button type="button" onClick={() => handlePickImage(true)}>
+            Tomar foto
+          </button>
+          <button type="button" onClick={() => handlePickImage(false)}>
+            Elegir de archivos
+          </button>
+        </div>
+      )}
+      
+      {/* Vista previa de la imagen si existe */}
+      {newDish.imageUrl && (
+        <div>
+          <img src={newDish.imageUrl} alt="Vista previa" style={{ width: '200px', height: 'auto' }} />
+        </div>
+      )}
+      
+      <button type="submit">Agregar Plato</button>
+    </form>
   );
-}
+};
 
-const styles = StyleSheet.create({
-  container: { 
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF'
-  },
-  title: { 
-    color: '#347FC2',
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: '6%',
-  },
-});
+export default AddDishForm;
