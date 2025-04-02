@@ -16,7 +16,6 @@ const MenuContext = createContext<MenuContextType | undefined>(undefined);
 export const MenuProvider = ({ children }: { children: ReactNode }) => {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
 
-  // Función para obtener todos los platos del menú
   const getMenuItems = async () => {
     try {
       const querySnapshot = await getDocs(collection(db, 'menuItems'));
@@ -30,17 +29,15 @@ export const MenuProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // Función para agregar un plato al menú
   const addMenuItem = async (menuItem: Omit<MenuItem, 'id'>) => {
     try {
       await addDoc(collection(db, 'menuItems'), menuItem);
-      await getMenuItems(); // Actualiza la lista
+      await getMenuItems();
     } catch (error) {
       console.error('Error al agregar el plato: ', error);
     }
   };
 
-  // Función para actualizar un plato del menú
   const updateMenuItem = async (id: string, updatedData: Partial<Omit<MenuItem, 'id'>>) => {
     try {
       const docRef = doc(db, 'menuItems', id);
@@ -51,7 +48,6 @@ export const MenuProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // Función para eliminar un plato del menú
   const deleteMenuItem = async (id: string) => {
     try {
       const docRef = doc(db, 'menuItems', id);
