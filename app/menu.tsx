@@ -5,7 +5,8 @@ import { useMenu } from '../context/MenuContext';
 import { MenuItem } from '../interfaces/MenuItem';
 import * as ImagePicker from 'expo-image-picker';
 import CustomButton from '../components/CustomButton';
-import { supabase } from '../utils/supabaseClient'; // Importa el cliente de Supabase
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { app } from '../utils/FireBaseConfig'; 
 
 const AddDishForm = () => {
   const { addMenuItem } = useMenu();
@@ -18,6 +19,31 @@ const AddDishForm = () => {
   });
   const [showImageOptions, setShowImageOptions] = useState(false);
 
+  // Función para subir la imagen a Firebase Storage y obtener la URL
+  const uploadImage = async (uri: string) => {
+    try {
+      // Convertir el URI en un Blob
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      const fileExt = uri.split('.').pop();
+      const fileName = `${new Date().getTime()}.${fileExt}`;
+
+      // Inicializar Firebase Storage y crear una referencia
+      const storage = getStorage(app);
+      const storageRef = ref(storage, `menu-images/${fileName}`);
+
+      // Subir el Blob
+      const snapshot = await uploadBytes(storageRef, blob);
+      // Obtener la URL de descarga pública
+      const downloadURL = await getDownloadURL(snapshot.ref);
+      return downloadURL;
+    } catch (error) {
+      console.error("Error subiendo imagen a Firebase Storage:", error);
+      return null;
+    }
+  };
+
+  // Función para manejar la selección de imagen (cámara o galería)
   const handlePickImage = async (fromCamera: boolean) => {
     let permissionResult;
     if (fromCamera) {
@@ -32,7 +58,10 @@ const AddDishForm = () => {
         quality: 1,
       });
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setNewDish({ ...newDish, imageUrl: result.assets[0].uri });
+        const downloadURL = await uploadImage(result.assets[0].uri);
+        if (downloadURL) {
+          setNewDish({ ...newDish, imageUrl: downloadURL });
+        }
       }
     } else {
       permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -46,12 +75,16 @@ const AddDishForm = () => {
         quality: 1,
       });
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setNewDish({ ...newDish, imageUrl: result.assets[0].uri });
+        const downloadURL = await uploadImage(result.assets[0].uri);
+        if (downloadURL) {
+          setNewDish({ ...newDish, imageUrl: downloadURL });
+        }
       }
     }
     setShowImageOptions(false);
   };
 
+  // Función para enviar el formulario y guardar el plato en Firestore
   const handleSubmit = async () => {
     await addMenuItem({
       name: newDish.name,
