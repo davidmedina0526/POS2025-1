@@ -23,9 +23,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#347FC2', 
     padding: 15, 
     borderRadius: 40, 
-    width: '80%', 
+    width: '40%', 
     alignItems: 'center', 
-    marginTop: '5%',
+    marginTop: '3%',
     marginBottom: '3%' 
   },
   buttonText: { 
