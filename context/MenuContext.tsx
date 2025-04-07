@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import React, { createContext, useContext, useState, ReactNode } from 'react';
+import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../utils/FireBaseConfig';
 import { MenuItem } from '../interfaces/MenuItem';
 
@@ -32,7 +32,7 @@ export const MenuProvider = ({ children }: { children: ReactNode }) => {
   const addMenuItem = async (menuItem: Omit<MenuItem, 'id'>) => {
     try {
       await addDoc(collection(db, 'menuItems'), menuItem);
-      await getMenuItems();
+      await getMenuItems(); // Actualiza la lista después de agregar un plato
     } catch (error) {
       console.error('Error al agregar el plato: ', error);
     }
@@ -42,7 +42,7 @@ export const MenuProvider = ({ children }: { children: ReactNode }) => {
     try {
       const docRef = doc(db, 'menuItems', id);
       await updateDoc(docRef, updatedData);
-      await getMenuItems();
+      await getMenuItems(); // Refresca la lista después de actualizar el plato
     } catch (error) {
       console.error('Error al actualizar el plato: ', error);
     }
@@ -52,15 +52,11 @@ export const MenuProvider = ({ children }: { children: ReactNode }) => {
     try {
       const docRef = doc(db, 'menuItems', id);
       await deleteDoc(docRef);
-      await getMenuItems();
+      await getMenuItems(); // Refresca la lista después de eliminar un plato
     } catch (error) {
       console.error('Error al eliminar el plato: ', error);
     }
   };
-
-  useEffect(() => {
-    getMenuItems();
-  }, []);
 
   return (
     <MenuContext.Provider value={{ menuItems, getMenuItems, addMenuItem, updateMenuItem, deleteMenuItem }}>
@@ -72,7 +68,7 @@ export const MenuProvider = ({ children }: { children: ReactNode }) => {
 export const useMenu = (): MenuContextType => {
   const context = useContext(MenuContext);
   if (!context) {
-    throw new Error('useMenu debe usarse dentro de un MenuProvider');
+    throw new Error('useMenu debe ser usado dentro de un MenuProvider');
   }
   return context;
 };
