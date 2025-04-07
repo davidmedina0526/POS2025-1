@@ -1,42 +1,40 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { useAuth } from '../context/AuthContext';
-import { useRouter } from 'expo-router';
+import React, { useEffect } from 'react';
+import { View, Text, Button, FlatList } from 'react-native';
+import { useWaiterContext } from '../context/WaiterContext'; // Asegúrate de que la ruta sea correcta
 
-export default function MeseroScreen() {
-  const { user } = useAuth();
-  const router = useRouter();
-  const [mounted, setMounted] = useState(false);
+const WaiterScreen: React.FC = () => {
+  const { selectTable, selectedTable, tables, loadTables } = useWaiterContext();
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (mounted && (!user || user.role !== 'mesero')) {
-      router.replace('./index');
-    }
-  }, [user, mounted]);
+    loadTables(); // Cargar mesas desde Firebase al montar el componente
+  }, [loadTables]);
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Pantalla de Mesero</Text>
-      {/* Contenido para el mesero */}
+    <View>
+      <Text>Mesas disponibles:</Text>
+      <FlatList
+        data={tables}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <View style={{ margin: 10 }}>
+            <Text>Mesa {item.id}</Text>
+            <Text>Status: {item.status}</Text>
+            <Button
+              title="Seleccionar Mesa"
+              disabled={item.status === 'no disponible'}
+              onPress={() => selectTable(item.id)}
+            />
+          </View>
+        )}
+      />
+      {selectedTable && (
+        <View style={{ marginTop: 20 }}>
+          <Text>Mesa seleccionada: {selectedTable.id}</Text>
+          {/* Aquí puedes añadir lógica para continuar con la orden */}
+        </View>
+      )}
     </View>
   );
-}
+};
 
-const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    backgroundColor: '#FFFFFF'
-  },
-  title: { 
-    color: '#347FC2',
-    fontSize: 24, 
-    fontWeight: 'bold',
-    marginBottom: '6%',
-  },
-});
+export default WaiterScreen;
