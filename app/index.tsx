@@ -40,7 +40,7 @@ export default function Index() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>TO DO (NAME)</Text>
+      <Text style={styles.title}>RestPOS</Text>
       <TextInput
         style={styles.input}
         placeholder="Email"

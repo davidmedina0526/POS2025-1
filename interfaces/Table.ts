@@ -1,6 +1,8 @@
+import { OrderItem } from "./OrderItem";
+
 export interface Table {
-    id: string; // ID de firebase
-    status: 'disponible' | 'no disponible'; // Estado de la mesa
-    orderId?: string; // ID de la orden asociada, puede ser null si no hay orden
-  }
-  
+  id: string;
+  status: 'disponible' | 'no disponible';
+  orderItems?: OrderItem[];
+  orderId?: string; // Se agrega esta propiedad
+}
