@@ -1,63 +1,68 @@
-// QRScannerScreen.tsx
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { BarCodeScanner } from 'expo-barcode-scanner';
-import { useRouter } from 'expo-router';
-import { useWaiterContext } from '../context/WaiterContext';
+import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
+import { router } from 'expo-router';
+import React from 'react';
+import { useState } from 'react';
+import { Button, Text, View, StyleSheet } from 'react-native';
 
-export default function QRScannerScreen() {
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+export default function App() {
+  const [facing, setFacing] = useState<CameraType>('back');
+  const [permission, requestPermission] = useCameraPermissions();
+  const [qr, setQr] = useState('');
   const [scanned, setScanned] = useState(false);
-  const router = useRouter();
-  const { selectTable } = useWaiterContext();
 
-  useEffect(() => {
-    (async () => {
-      const { status } = await BarCodeScanner.requestPermissionsAsync();
-      setHasPermission(status === 'granted');
-    })();
-  }, []);
-
-  const handleBarCodeScanned = ({ type, data }: { type: string; data: string }) => {
-    setScanned(true);
-    // Suponemos que el código QR contiene el ID de la mesa con el formato "table_X"
-    if (data.startsWith('table_')) {
-      // Se asigna la mesa escaneada a la sesión/usuario
-      selectTable(data);
-      // Redirige a la pantalla de mesero y abre el modal del menú pasando el parámetro openMenu
-      router.replace({ pathname: '/mesero', params: { openMenu: 'true' } });
-    } else {
-      Alert.alert('QR inválido', 'El código QR escaneado no es válido para una mesa.');
-      setScanned(false);
+  const handleQrScanned = ({ data }: { data: string }) => {
+    if (!scanned) {
+      setQr(data);
+      setScanned(true);
+      console.log('QR Scanned:', data);
     }
   };
 
-  if (hasPermission === null) {
-    return (
-      <View style={styles.centered}>
-        <Text>Solicitando permiso para usar la cámara...</Text>
-      </View>
-    );
+  if (!permission) {
+    return <View />;
   }
-  if (hasPermission === false) {
+
+  if (!permission.granted) {
     return (
-      <View style={styles.centered}>
-        <Text>Sin acceso a la cámara</Text>
+      <View style={styles.container}>
+        <Text style={styles.text}>We need your permission to show the camera</Text>
+        <Button onPress={requestPermission} title="Grant permission" />
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <BarCodeScanner
-        onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
-        style={StyleSheet.absoluteFillObject}
+      <CameraView
+        style={styles.camera}
+        facing={facing}
+        barcodeScannerSettings={{
+          barcodeTypes: ['qr'],
+        }}
+        onBarcodeScanned={handleQrScanned}
       />
-      {scanned && (
-        <TouchableOpacity style={styles.button} onPress={() => setScanned(false)}>
-          <Text style={styles.buttonText}>Escanear de nuevo</Text>
-        </TouchableOpacity>
-      )}
+
+      {qr ? (
+        <View style={styles.qrInfo}>
+          <Text style={styles.qrText}>Estas sentado en la mesa: {qr}</Text>
+          <Button
+            title="Scan Again"
+            onPress={() => {
+              setQr('');
+              setScanned(false);
+            }}
+          />
+          <Button
+            title="Go to Menu"
+            onPress={() => {
+              router.push({
+                pathname: '/cliente',
+                params: { qr },
+              });
+            }}
+          />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -65,22 +70,32 @@ export default function QRScannerScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FBB03B',
+    padding: 20,
   },
-  button: {
-    backgroundColor: '#347FC2',
-    padding: 10,
-    borderRadius: 5,
+  text: {
+    fontSize: 18,
+    color: '#fff',
+    marginBottom: 10,
+  },
+  camera: {
+    width: '50%',
+    height: '50%',
+    borderRadius: 20, 
     position: 'absolute',
-    bottom: 50,
-    alignSelf: 'center',
   },
-  buttonText: {
-    color: '#FFF',
-    fontWeight: 'bold',
+  qrInfo: {
+    position: 'absolute',
+    bottom: 100,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
   },
-});
+  qrText: {
+    fontSize: 18,
+    color: 'white',
+    marginBottom: 10,
+  },
+})
