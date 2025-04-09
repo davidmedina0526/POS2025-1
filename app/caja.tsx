@@ -19,7 +19,7 @@ export default function CajaScreen() {
       const ordersData: Order[] = [];
       querySnapshot.forEach((doc) => {
         const data = doc.data();
-        if (data.status === 'pendiente') {
+        if (data.status === 'listo') {
           // Asegurémonos de que todas las propiedades de la orden se asignen correctamente
           const order: Order = {
             id: doc.id, // El id de la orden
