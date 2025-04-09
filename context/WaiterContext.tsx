@@ -9,11 +9,9 @@ import {
   query,
   onSnapshot,
   Timestamp,
-  deleteDoc, // Importar deleteDoc para eliminar documentos
 } from 'firebase/firestore';
 import { Table } from '../interfaces/Table'; // La interfaz Table debe incluir orderId si lo usarás
 import { Order, OrderItem } from '../interfaces/Order';
-import { MenuItem } from '../interfaces/MenuItem';
 
 interface WaiterContextType {
   selectedTable: Table | null;
@@ -83,26 +81,6 @@ export const WaiterProvider: React.FC<WaiterProviderProps> = ({ children }) => {
     return () => unsubscribeTables();
   }, []);
 
-  // Listener en tiempo real para la colección de órdenes:
-  // Si se elimina una orden, actualizamos la mesa asociada para que vuelva a estar disponible.
-  useEffect(() => {
-    const ordersRef = collection(db, 'orders');
-    const unsubscribeOrders = onSnapshot(ordersRef, (snapshot) => {
-      snapshot.docChanges().forEach((change) => {
-        if (change.type === 'removed') {
-          const removedOrder = change.doc.data() as Order;
-          const tableRef = doc(db, 'tables', removedOrder.tableId);
-          setDoc(tableRef, { 
-            status: 'disponible',
-            orderItems: [],
-            orderId: null
-          }, { merge: true });
-        }
-      });
-    });
-    return () => unsubscribeOrders();
-  }, []);
-
   // Seleccionar mesa (actualiza el estado local)
   const selectTable = (tableId: string) => {
     const table = tables.find((table) => table.id === tableId);
@@ -169,22 +147,20 @@ export const WaiterProvider: React.FC<WaiterProviderProps> = ({ children }) => {
     );
   };
 
-  // Nueva función para liberar la mesa y borrar la orden asociada
+  // Nueva función para liberar la mesa y quitar la orden asociada sin eliminarla
   const freeTable = async (tableId: string) => {
     const tableRef = doc(db, 'tables', tableId);
     const tableSnap = await getDoc(tableRef);
     if (tableSnap.exists()) {
       const tableData = tableSnap.data();
       if (tableData.orderId) {
-        // Borrar la orden asociada
-        await deleteDoc(doc(db, 'orders', tableData.orderId));
+        // Solo quitar el orderId de la mesa sin eliminar la orden
+        await setDoc(
+          tableRef,
+          { status: 'disponible', orderId: null, orderItems: [] },
+          { merge: true }
+        );
       }
-      // Actualizar la mesa para que esté disponible
-      await setDoc(
-        tableRef,
-        { status: 'disponible', orderId: null, orderItems: [] },
-        { merge: true }
-      );
     }
   };
 
