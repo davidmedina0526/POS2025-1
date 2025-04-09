@@ -1,15 +1,54 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  TouchableOpacity, 
+  Modal, 
+  FlatList, 
+  TextInput, 
+  Alert,
+  Image
+} from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { useRouter } from 'expo-router';
+import { useMenu } from '../context/MenuContext';
+import { useWaiterContext } from '../context/WaiterContext';
+import { OrderItem } from '../interfaces/OrderItem';
+import { MenuItem } from '@/interfaces/MenuItem';
+import { Table } from '@/interfaces/Table';
 
-export default function MeseroScreen() {
+export default function WaiterScreen() {
   const { user } = useAuth();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
 
+  const {
+    tables,
+    selectTable,
+    selectedTable,
+    createOrder,
+    loadTables,
+    addOrderItem,
+    freeTable, // Se extrae la función para liberar la mesa
+  } = useWaiterContext();
+
+  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
+  const [showMenuModal, setShowMenuModal] = useState(false);
+  const [showOrderModal, setShowOrderModal] = useState(false);
+
+  const [selectedMenuItem, setSelectedMenuItem] = useState<MenuItem | null>(null);
+  const [quantity, setQuantity] = useState<string>('1');
+  const [selectedCategory, setSelectedCategory] = useState<
+    'entrada' | 'plato principal' | 'postre' | 'bebida' | null
+  >(null);
+
+  const { menuItems, getMenuItems } = useMenu();
+
   useEffect(() => {
     setMounted(true);
+    loadTables();
+    getMenuItems();
   }, []);
 
   useEffect(() => {
@@ -18,10 +57,216 @@ export default function MeseroScreen() {
     }
   }, [user, mounted]);
 
+  const handleSelectTable = (table: Table) => {
+    if (table.status === 'disponible') {
+      selectTable(table.id);
+      setShowMenuModal(true);
+      setSelectedCategory(null);
+    } else {
+      Alert.alert('Mesa ocupada', 'Esta mesa ya tiene una orden asignada.');
+      const currentOrderItems = tables.find(item => item.id === table.id)?.orderItems;
+      if (currentOrderItems) {
+        setOrderItems(currentOrderItems);
+      }
+    }
+  };
+
+  // Nuevo manejador para liberar la mesa
+  const handleFreeTable = async (tableId: string) => {
+    try {
+      await freeTable(tableId);
+      Alert.alert('Mesa liberada', 'La mesa se ha liberado y la orden se ha borrado.');
+    } catch (error) {
+      console.error('Error al liberar la mesa:', error);
+      Alert.alert('Error', 'No se pudo liberar la mesa.');
+    }
+  };
+
+  const handleSelectMenuItem = (menuItem: MenuItem) => {
+    setSelectedMenuItem(menuItem);
+    setQuantity('1');
+  };
+
+  const addItemToOrder = () => {
+    if (!selectedMenuItem) return;
+
+    const parsedQuantity = parseInt(quantity);
+    if (isNaN(parsedQuantity) || parsedQuantity <= 0) {
+      Alert.alert('Cantidad inválida', 'Ingresa una cantidad mayor a 0');
+      return;
+    }
+
+    const index = orderItems.findIndex(item => item.menuItemId === selectedMenuItem.id);
+    if (index > -1) {
+      const updatedItems = [...orderItems];
+      updatedItems[index].quantity += parsedQuantity;
+      setOrderItems(updatedItems);
+      addOrderItem(selectedTable?.id || '', updatedItems[index]);
+    } else {
+      const newItem: OrderItem = {
+        menuItemId: selectedMenuItem.id,
+        name: selectedMenuItem.name,
+        quantity: parsedQuantity,
+        price: selectedMenuItem.price,
+      };
+      setOrderItems(prev => [...prev, newItem]);
+      addOrderItem(selectedTable?.id || '', newItem);
+    }
+    setSelectedMenuItem(null);
+    setQuantity('1');
+  };
+
+  const sendOrder = async () => {
+    if (!selectedTable) return;
+    await createOrder(selectedTable.id, orderItems);
+    Alert.alert('Orden enviada', 'La orden se ha enviado a la cocina');
+    setOrderItems([]);
+    setShowOrderModal(false);
+    selectTable('');
+  };
+
+  const filteredMenuItems = selectedCategory
+    ? menuItems.filter(item => item.category === selectedCategory)
+    : [];
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Pantalla de Mesero</Text>
-      {/* Contenido para el mesero */}
+      <Text style={styles.title}>Welcome, waiter!</Text>
+
+      {/* Lista de mesas */}
+      <FlatList
+        data={tables}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <TouchableOpacity style={styles.table} onPress={() => handleSelectTable(item)}>
+            <Text style={styles.tableText}>Table {item.id}</Text>
+            <Text style={styles.tableText}>
+              {item.status === 'disponible' ? 'Available' : 'Occupied'}
+            </Text>
+            {/* Botón para liberar la mesa */}
+            <TouchableOpacity style={styles.freeButton} onPress={() => handleFreeTable(item.id)}>
+              <Image 
+                source={require('../assets/images/door.png')}
+                style={{ width: 25, height: 25 }}
+              />
+            </TouchableOpacity>
+          </TouchableOpacity>
+        )}
+      />
+
+      <TouchableOpacity style={styles.orderButton} onPress={() => setShowOrderModal(true)}>
+        <Text style={styles.orderButtonText}>View Order</Text>
+      </TouchableOpacity>
+
+      <Modal visible={showMenuModal} animationType="slide">
+        <View style={styles.modalContainer}>
+          <Text style={styles.modalTitle}>Menu</Text>
+          {!selectedCategory && (
+            <View style={styles.categoryContainer}>
+              <TouchableOpacity 
+                style={styles.categoryButton} 
+                onPress={() => setSelectedCategory('entrada')}>
+                <Text style={styles.categoryButtonText}>Appetizers</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.categoryButton} 
+                onPress={() => setSelectedCategory('plato principal')}>
+                <Text style={styles.categoryButtonText}>Main Dishes</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.categoryButton} 
+                onPress={() => setSelectedCategory('postre')}>
+                <Text style={styles.categoryButtonText}>Desserts</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.categoryButton} 
+                onPress={() => setSelectedCategory('bebida')}>
+                <Text style={styles.categoryButtonText}>Beverages</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {selectedCategory && (
+            <>
+              <View style={styles.backCategoryContainer}>
+                <TouchableOpacity 
+                  style={styles.backCategoryButton} 
+                  onPress={() => setSelectedCategory(null)}>
+                  <Text style={styles.backCategoryButtonText}>Go Back</Text>
+                </TouchableOpacity>
+              </View>
+              <FlatList
+                data={filteredMenuItems}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => (
+                  <TouchableOpacity style={styles.menuItem} onPress={() => handleSelectMenuItem(item)}>
+                    <Text style={styles.menuItemText}>{item.name}</Text>
+                    <Text style={styles.menuItemText}>${item.price}</Text>
+                  </TouchableOpacity>
+                )}
+              />
+            </>
+          )}
+
+          {selectedMenuItem && (
+            <View style={styles.quantityContainer}>
+              <Text style={styles.quantityLabel}>
+                Enter quantity for {selectedMenuItem.name}:
+              </Text>
+              <TextInput
+                style={styles.quantityInput}
+                value={quantity}
+                onChangeText={setQuantity}
+                keyboardType="numeric"
+              />
+              <TouchableOpacity style={styles.addButton} onPress={addItemToOrder}>
+                <Text style={styles.addButtonText}>Add to Order</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          <TouchableOpacity style={styles.closeModalButton} onPress={() => setShowMenuModal(false)}>
+            <Text style={styles.closeModalText}>Close Menu</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
+
+      <Modal visible={showOrderModal} animationType="slide">
+        <View style={styles.modalContainer}>
+          <Text style={styles.modalTitle}>Customer Order</Text>
+          <FlatList
+            data={orderItems}
+            keyExtractor={(item) => item.menuItemId}
+            renderItem={({ item }) => (
+              <View style={styles.orderItem}>
+                <Text>{item.name}</Text>
+                <Text>Quantity: {item.quantity}</Text>
+                <TextInput
+                  style={styles.quantityInput}
+                  value={item.quantity.toString()}
+                  keyboardType="numeric"
+                  onChangeText={(text) =>
+                    setOrderItems(orderItems.map(orderItem =>
+                      orderItem.menuItemId === item.menuItemId
+                        ? { ...orderItem, quantity: parseInt(text) }
+                        : orderItem
+                    ))
+                  }
+                />
+                <TouchableOpacity onPress={() => setOrderItems(orderItems.filter(orderItem => orderItem.menuItemId !== item.menuItemId))}>
+                  <Text style={styles.deleteText}>Remove</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          />
+          <TouchableOpacity style={styles.sendOrderButton} onPress={sendOrder}>
+            <Text style={styles.sendOrderButtonText}>Send Order</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.closeModalButton} onPress={() => setShowOrderModal(false)}>
+            <Text>Close Order</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -29,14 +274,164 @@ export default function MeseroScreen() {
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    backgroundColor: '#FFFFFF'
+    padding: 20,
+    backgroundColor: '#FFFFFF',
   },
   title: { 
     color: '#347FC2',
     fontSize: 24, 
     fontWeight: 'bold',
-    marginBottom: '6%',
+    marginTop: 20,
+    marginBottom: 50,
+    textAlign: 'center'
+  },
+  table: {
+    padding: 15,
+    borderWidth: 1,
+    borderColor: '#CCC',
+    marginBottom: 10,
+    borderRadius: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+  },
+  tableText: {
+    fontSize: 16,
+    alignSelf: 'center',
+  },
+  freeButton: {
+    backgroundColor: '#DD1616',
+    borderRadius: 5,
+    padding: 5,
+    alignSelf: 'center',
+  },
+  orderButton: {
+    position: 'absolute',
+    top: 55,
+    right: 20,
+    backgroundColor: '#347FC2',
+    padding: 10,
+    borderRadius: 5,
+    marginTop: 30,
+  },
+  orderButtonText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+  },
+  modalContainer: {
+    flex: 1,
+    padding: 20,
+    backgroundColor: '#FFFFFF',
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 50,
+    marginTop: 30,
+    textAlign: 'center'
+  },
+  categoryContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-around',
+    marginBottom: 20,
+  },
+  categoryButton: {
+    backgroundColor: '#347FC2',
+    padding: 10,
+    borderRadius: 5,
+    margin: 5,
+    marginBottom: 35,
+    width: '80%',
+  },
+  categoryButtonText: {
+    color: '#FFF',
+    fontSize: 17,
+    alignSelf: 'center',
+    fontWeight: 'bold',
+  },
+  backCategoryContainer: {
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  backCategoryButton: {
+    backgroundColor: '#AAA',
+    padding: 8,
+    marginBottom: 20,
+    borderRadius: 5,
+  },
+  backCategoryButtonText: {
+    color: '#FFF',
+    fontSize: 17,
+    fontWeight: 'bold',
+  },
+  menuItem: {
+    padding: 11,
+    borderBottomWidth: 1,
+    borderColor: '#EEE'
+  },
+  menuItemText: {
+    fontSize: 15
+  },
+  quantityContainer: {
+    marginVertical: 20,
+    alignItems: 'center'
+  },
+  quantityLabel: {
+    fontSize: 15,
+    marginBottom: 10
+  },
+  quantityInput: {
+    borderWidth: 1,
+    borderColor: '#CCC',
+    padding: 5,
+    marginBottom: 20,
+    width: 60,
+    textAlign: 'center',
+    marginVertical: 10
+  },
+  addButton: {
+    backgroundColor: '#347FC2',
+    padding: 10,
+    borderRadius: 5,
+  },
+  addButtonText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+  },
+  closeModalButton: {
+    backgroundColor: '#AAA',
+    padding: 10,
+    borderRadius: 5,
+    marginTop: 20,
+    alignSelf: 'center'
+  },
+  closeModalText: {
+    fontSize: 17,
+    fontWeight: 'bold',
+    color: '#FFF',
+  },
+  orderItem: {
+    padding: 10,
+    borderBottomWidth: 1,
+    borderColor: '#EEE',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between'
+  },
+  deleteText: {
+    color: 'red',
+    marginLeft: 10
+  },
+  sendOrderButton: {
+    backgroundColor: 'green',
+    padding: 15,
+    borderRadius: 5,
+    marginTop: 20,
+    alignItems: 'center'
+  },
+  sendOrderButtonText: {
+    color: '#FFF',
+    fontWeight: 'bold'
   },
 });
