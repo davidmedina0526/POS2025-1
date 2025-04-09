@@ -131,7 +131,7 @@ export default function WaiterScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Waiter Screen</Text>
+      <Text style={styles.title}>Welcome, waiter!</Text>
 
       {/* Lista de mesas */}
       <FlatList
@@ -147,7 +147,7 @@ export default function WaiterScreen() {
             <TouchableOpacity style={styles.freeButton} onPress={() => handleFreeTable(item.id)}>
               <Image 
                 source={require('../assets/images/door.png')}
-                style={{ width: 27, height: 27 }}
+                style={{ width: 25, height: 25 }}
               />
             </TouchableOpacity>
           </TouchableOpacity>
@@ -166,22 +166,22 @@ export default function WaiterScreen() {
               <TouchableOpacity 
                 style={styles.categoryButton} 
                 onPress={() => setSelectedCategory('entrada')}>
-                <Text style={styles.categoryButtonText}>Entrada</Text>
+                <Text style={styles.categoryButtonText}>Appetizers</Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.categoryButton} 
                 onPress={() => setSelectedCategory('plato principal')}>
-                <Text style={styles.categoryButtonText}>Plato Principal</Text>
+                <Text style={styles.categoryButtonText}>Main Dishes</Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.categoryButton} 
                 onPress={() => setSelectedCategory('postre')}>
-                <Text style={styles.categoryButtonText}>Postre</Text>
+                <Text style={styles.categoryButtonText}>Desserts</Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.categoryButton} 
                 onPress={() => setSelectedCategory('bebida')}>
-                <Text style={styles.categoryButtonText}>Bebida</Text>
+                <Text style={styles.categoryButtonText}>Beverages</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -192,7 +192,7 @@ export default function WaiterScreen() {
                 <TouchableOpacity 
                   style={styles.backCategoryButton} 
                   onPress={() => setSelectedCategory(null)}>
-                  <Text style={styles.backCategoryButtonText}>Volver a categorías</Text>
+                  <Text style={styles.backCategoryButtonText}>Go Back</Text>
                 </TouchableOpacity>
               </View>
               <FlatList
@@ -226,7 +226,7 @@ export default function WaiterScreen() {
           )}
 
           <TouchableOpacity style={styles.closeModalButton} onPress={() => setShowMenuModal(false)}>
-            <Text>Close Menu</Text>
+            <Text style={styles.closeModalText}>Close Menu</Text>
           </TouchableOpacity>
         </View>
       </Modal>
@@ -275,13 +275,14 @@ const styles = StyleSheet.create({
   container: { 
     flex: 1, 
     padding: 20,
-    backgroundColor: '#FFFFFF'
+    backgroundColor: '#FFFFFF',
   },
   title: { 
     color: '#347FC2',
     fontSize: 24, 
     fontWeight: 'bold',
-    marginBottom: 20,
+    marginTop: 20,
+    marginBottom: 50,
     textAlign: 'center'
   },
   table: {
@@ -291,37 +292,42 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderRadius: 8,
     flexDirection: 'row',
-    justifyContent: 'space-between'
+    justifyContent: 'space-between',
+    marginTop: 20,
   },
   tableText: {
-    fontSize: 16
+    fontSize: 16,
+    alignSelf: 'center',
   },
   freeButton: {
     backgroundColor: '#DD1616',
     borderRadius: 5,
     padding: 5,
+    alignSelf: 'center',
   },
   orderButton: {
     position: 'absolute',
-    top: 40,
+    top: 55,
     right: 20,
     backgroundColor: '#347FC2',
     padding: 10,
     borderRadius: 5,
+    marginTop: 30,
   },
   orderButtonText: {
     color: '#FFF',
-    fontWeight: 'bold'
+    fontWeight: 'bold',
   },
   modalContainer: {
     flex: 1,
     padding: 20,
-    backgroundColor: '#FFFFFF'
+    backgroundColor: '#FFFFFF',
   },
   modalTitle: {
     fontSize: 22,
     fontWeight: 'bold',
-    marginBottom: 20,
+    marginBottom: 50,
+    marginTop: 30,
     textAlign: 'center'
   },
   categoryContainer: {
@@ -335,10 +341,14 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 5,
     margin: 5,
+    marginBottom: 35,
+    width: '80%',
   },
   categoryButtonText: {
     color: '#FFF',
-    fontSize: 14,
+    fontSize: 17,
+    alignSelf: 'center',
+    fontWeight: 'bold',
   },
   backCategoryContainer: {
     alignItems: 'center',
@@ -347,32 +357,35 @@ const styles = StyleSheet.create({
   backCategoryButton: {
     backgroundColor: '#AAA',
     padding: 8,
+    marginBottom: 20,
     borderRadius: 5,
   },
   backCategoryButtonText: {
     color: '#FFF',
-    fontSize: 14,
+    fontSize: 17,
+    fontWeight: 'bold',
   },
   menuItem: {
-    padding: 15,
+    padding: 11,
     borderBottomWidth: 1,
     borderColor: '#EEE'
   },
   menuItemText: {
-    fontSize: 16
+    fontSize: 15
   },
   quantityContainer: {
     marginVertical: 20,
     alignItems: 'center'
   },
   quantityLabel: {
-    fontSize: 16,
+    fontSize: 15,
     marginBottom: 10
   },
   quantityInput: {
     borderWidth: 1,
     borderColor: '#CCC',
     padding: 5,
+    marginBottom: 20,
     width: 60,
     textAlign: 'center',
     marginVertical: 10
@@ -383,14 +396,20 @@ const styles = StyleSheet.create({
     borderRadius: 5,
   },
   addButtonText: {
-    color: '#FFF'
+    color: '#FFF',
+    fontWeight: 'bold',
   },
   closeModalButton: {
-    backgroundColor: '#CCC',
+    backgroundColor: '#AAA',
     padding: 10,
     borderRadius: 5,
     marginTop: 20,
     alignSelf: 'center'
+  },
+  closeModalText: {
+    fontSize: 17,
+    fontWeight: 'bold',
+    color: '#FFF',
   },
   orderItem: {
     padding: 10,
