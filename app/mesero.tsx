@@ -30,7 +30,7 @@ export default function WaiterScreen() {
     createOrder,
     loadTables,
     addOrderItem,
-    freeTable, // Se extrae la función para liberar la mesa
+    freeTable, // Función para liberar la mesa
   } = useWaiterContext();
 
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
@@ -71,7 +71,7 @@ export default function WaiterScreen() {
     }
   };
 
-  // Nuevo manejador para liberar la mesa
+  // Manejador para liberar la mesa y borrar la orden asociada
   const handleFreeTable = async (tableId: string) => {
     try {
       await freeTable(tableId);
@@ -158,9 +158,14 @@ export default function WaiterScreen() {
         <Text style={styles.orderButtonText}>View Order</Text>
       </TouchableOpacity>
 
+      {/* Modal para seleccionar platos del menú */}
       <Modal visible={showMenuModal} animationType="slide">
         <View style={styles.modalContainer}>
           <Text style={styles.modalTitle}>Menu</Text>
+          {/* Muestra la mesa en la que se realiza la orden */}
+          {selectedTable && (
+            <Text style={styles.orderTableInfo}>Table {selectedTable.id}</Text>
+          )}
           {!selectedCategory && (
             <View style={styles.categoryContainer}>
               <TouchableOpacity 
@@ -231,9 +236,14 @@ export default function WaiterScreen() {
         </View>
       </Modal>
 
+      {/* Modal para ver y editar la orden */}
       <Modal visible={showOrderModal} animationType="slide">
         <View style={styles.modalContainer}>
           <Text style={styles.modalTitle}>Customer Order</Text>
+          {/* Muestra la mesa para la orden en el modal de orden */}
+          {selectedTable && (
+            <Text style={styles.orderTableInfo}>Table {selectedTable.id}</Text>
+          )}
           <FlatList
             data={orderItems}
             keyExtractor={(item) => item.menuItemId}
@@ -283,7 +293,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginTop: 20,
     marginBottom: 50,
-    textAlign: 'center'
+    textAlign: 'center',
   },
   table: {
     padding: 15,
@@ -326,9 +336,16 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 22,
     fontWeight: 'bold',
-    marginBottom: 50,
+    marginBottom: 20,
     marginTop: 30,
-    textAlign: 'center'
+    textAlign: 'center',
+  },
+  orderTableInfo: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 20,
+    color: '#555',
+    fontWeight: 'bold',
   },
   categoryContainer: {
     flexDirection: 'row',
@@ -368,18 +385,18 @@ const styles = StyleSheet.create({
   menuItem: {
     padding: 11,
     borderBottomWidth: 1,
-    borderColor: '#EEE'
+    borderColor: '#EEE',
   },
   menuItemText: {
-    fontSize: 15
+    fontSize: 15,
   },
   quantityContainer: {
     marginVertical: 20,
-    alignItems: 'center'
+    alignItems: 'center',
   },
   quantityLabel: {
     fontSize: 15,
-    marginBottom: 10
+    marginBottom: 10,
   },
   quantityInput: {
     borderWidth: 1,
@@ -388,7 +405,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     width: 60,
     textAlign: 'center',
-    marginVertical: 10
+    marginVertical: 10,
   },
   addButton: {
     backgroundColor: '#347FC2',
@@ -404,7 +421,7 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 5,
     marginTop: 20,
-    alignSelf: 'center'
+    alignSelf: 'center',
   },
   closeModalText: {
     fontSize: 17,
@@ -417,21 +434,21 @@ const styles = StyleSheet.create({
     borderColor: '#EEE',
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between'
+    justifyContent: 'space-between',
   },
   deleteText: {
     color: 'red',
-    marginLeft: 10
+    marginLeft: 10,
   },
   sendOrderButton: {
     backgroundColor: 'green',
     padding: 15,
     borderRadius: 5,
     marginTop: 20,
-    alignItems: 'center'
+    alignItems: 'center',
   },
   sendOrderButtonText: {
     color: '#FFF',
-    fontWeight: 'bold'
+    fontWeight: 'bold',
   },
 });
