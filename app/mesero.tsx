@@ -17,6 +17,7 @@ import { useWaiterContext } from '../context/WaiterContext';
 import { OrderItem } from '../interfaces/OrderItem';
 import { MenuItem } from '@/interfaces/MenuItem';
 import { Table } from '@/interfaces/Table';
+import { Button } from 'react-native'; // Asegúrate de importar Button
 
 export default function WaiterScreen() {
   const { user } = useAuth();
@@ -31,6 +32,9 @@ export default function WaiterScreen() {
     loadTables,
     addOrderItem,
     freeTable, // Se extrae la función para liberar la mesa
+    showPopup,
+    orderForPopup,
+    setShowPopup,
   } = useWaiterContext();
 
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
@@ -71,7 +75,6 @@ export default function WaiterScreen() {
     }
   };
 
-  // Nuevo manejador para liberar la mesa
   const handleFreeTable = async (tableId: string) => {
     try {
       await freeTable(tableId);
@@ -157,6 +160,20 @@ export default function WaiterScreen() {
       <TouchableOpacity style={styles.orderButton} onPress={() => setShowOrderModal(true)}>
         <Text style={styles.orderButtonText}>View Order</Text>
       </TouchableOpacity>
+
+      {/* Popup de la orden lista */}
+      <Modal visible={showPopup} animationType="slide">
+        <View style={styles.modalContainer}>
+          <Text style={styles.modalTitle}>¡Pedido Listo!</Text>
+          {orderForPopup && (
+            <>
+              <Text>Orden ID: {orderForPopup.id}</Text>
+              <Text>Total: ${orderForPopup.total}</Text>
+            </>
+          )}
+          <Button title="Cerrar" onPress={() => setShowPopup(false)} />
+        </View>
+      </Modal>
 
       <Modal visible={showMenuModal} animationType="slide">
         <View style={styles.modalContainer}>
