@@ -10,7 +10,7 @@ import {
   onSnapshot,
   Timestamp,
 } from 'firebase/firestore';
-import { Table } from '../interfaces/Table'; // La interfaz Table debe incluir orderId si lo usarás
+import { Table } from '../interfaces/Table';
 import { Order, OrderItem } from '../interfaces/Order';
 
 interface WaiterContextType {
@@ -19,11 +19,14 @@ interface WaiterContextType {
   orders: Order[];
   selectTable: (tableId: string) => void;
   createOrder: (tableId: string, items: OrderItem[]) => void;
-  getOrders: () => void;
+  getOrders: () => void; // Agregado getOrders
   addOrderItem: (orderId: string, item: OrderItem) => void;
   updateOrderStatus: (orderId: string, status: 'pendiente' | 'en preparación' | 'listo' | 'cancelado') => void;
   loadTables: () => void;
-  freeTable: (tableId: string) => Promise<void>; // Nueva función
+  freeTable: (tableId: string) => Promise<void>;
+  showPopup: boolean;
+  orderForPopup: Order | null;
+  setShowPopup: (show: boolean) => void;
 }
 
 const WaiterContext = createContext<WaiterContextType | undefined>(undefined);
@@ -36,16 +39,13 @@ export const useWaiterContext = () => {
   return context;
 };
 
-interface WaiterProviderProps {
-  children: React.ReactNode;
-}
-
-export const WaiterProvider: React.FC<WaiterProviderProps> = ({ children }) => {
+export const WaiterProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
   const [tables, setTables] = useState<Table[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [showPopup, setShowPopup] = useState(false);
+  const [orderForPopup, setOrderForPopup] = useState<Order | null>(null);
 
-  // Función para cargar mesas (se puede usar en flujos manuales)
   const loadTables = async () => {
     const tablesQuery = query(collection(db, 'tables'));
     const querySnapshot = await getDocs(tablesQuery);
@@ -56,32 +56,46 @@ export const WaiterProvider: React.FC<WaiterProviderProps> = ({ children }) => {
         id: docSnapshot.id,
         status: tableData.status,
         orderItems: tableData.orderItems || [],
-        orderId: tableData.orderId || null, // Asegúrate de incluir este campo si lo usarás
+        orderId: tableData.orderId || null,
       });
     });
     setTables(fetchedTables);
   };
 
-  // Listener en tiempo real para actualizar las mesas automáticamente.
-  useEffect(() => {
-    const tablesRef = collection(db, 'tables');
-    const unsubscribeTables = onSnapshot(tablesRef, (snapshot) => {
-      const fetchedTables: Table[] = [];
-      snapshot.forEach((docSnapshot) => {
-        const tableData = docSnapshot.data();
-        fetchedTables.push({
-          id: docSnapshot.id,
-          status: tableData.status,
-          orderItems: tableData.orderItems || [],
-          orderId: tableData.orderId || null,
-        });
-      });
-      setTables(fetchedTables);
+  // Función para cargar órdenes (agregada)
+  const getOrders = async () => {
+    const ordersQuery = query(collection(db, 'orders'));
+    const querySnapshot = await getDocs(ordersQuery);
+    const fetchedOrders: Order[] = [];
+    querySnapshot.forEach((docSnapshot) => {
+      fetchedOrders.push(docSnapshot.data() as Order);
     });
-    return () => unsubscribeTables();
+    setOrders(fetchedOrders);
+  };
+
+  useEffect(() => {
+    const ordersRef = collection(db, 'orders');
+    const unsubscribeOrders = onSnapshot(ordersRef, (snapshot) => {
+      snapshot.forEach((docSnapshot) => {
+        const orderData = docSnapshot.data();
+        if (orderData.status === 'listo') {
+          const order: Order = {
+            id: docSnapshot.id,
+            tableId: orderData.tableId,
+            items: orderData.items || [],
+            total: orderData.total,
+            status: orderData.status,
+            createdAt: orderData.createdAt,
+          };
+          setOrderForPopup(order);
+          setShowPopup(true);
+        }
+      });
+    });
+
+    return () => unsubscribeOrders();
   }, []);
 
-  // Seleccionar mesa (actualiza el estado local)
   const selectTable = (tableId: string) => {
     const table = tables.find((table) => table.id === tableId);
     if (table) {
@@ -89,7 +103,6 @@ export const WaiterProvider: React.FC<WaiterProviderProps> = ({ children }) => {
     }
   };
 
-  // Crear una nueva orden y actualizar la mesa para reflejar que ya está ocupada
   const createOrder = async (tableId: string, items: OrderItem[]) => {
     const orderRef = doc(collection(db, 'orders'));
     const newOrder: Order = {
@@ -105,23 +118,11 @@ export const WaiterProvider: React.FC<WaiterProviderProps> = ({ children }) => {
 
     await setDoc(doc(db, 'tables', tableId), { 
       status: 'no disponible',
-      orderId: newOrder.id,       // Se asigna el id de la orden
-      orderItems: newOrder.items, // Se almacenan también los items de la orden si se requiere
+      orderId: newOrder.id,
+      orderItems: newOrder.items,
     }, { merge: true });
   };
 
-  // Obtener todas las órdenes (este método se puede usar en flujos que no requieran real-time)
-  const getOrders = async () => {
-    const ordersQuery = query(collection(db, 'orders'));
-    const querySnapshot = await getDocs(ordersQuery);
-    const fetchedOrders: Order[] = [];
-    querySnapshot.forEach((docSnapshot) => {
-      fetchedOrders.push(docSnapshot.data() as Order);
-    });
-    setOrders(fetchedOrders);
-  };
-
-  // Agregar un ítem a una orden existente
   const addOrderItem = async (orderId: string, item: OrderItem) => {
     const orderRef = doc(db, 'orders', orderId);
     const orderSnap = await getDoc(orderRef);
@@ -133,11 +134,7 @@ export const WaiterProvider: React.FC<WaiterProviderProps> = ({ children }) => {
     }
   };
 
-  // Actualizar el estado de una orden
-  const updateOrderStatus = async (
-    orderId: string,
-    status: 'pendiente' | 'en preparación' | 'listo' | 'cancelado'
-  ) => {
+  const updateOrderStatus = async (orderId: string, status: 'pendiente' | 'en preparación' | 'listo' | 'cancelado') => {
     const orderRef = doc(db, 'orders', orderId);
     await setDoc(orderRef, { status }, { merge: true });
     setOrders((prevOrders) =>
@@ -147,19 +144,13 @@ export const WaiterProvider: React.FC<WaiterProviderProps> = ({ children }) => {
     );
   };
 
-  // Nueva función para liberar la mesa y quitar la orden asociada sin eliminarla
   const freeTable = async (tableId: string) => {
     const tableRef = doc(db, 'tables', tableId);
     const tableSnap = await getDoc(tableRef);
     if (tableSnap.exists()) {
       const tableData = tableSnap.data();
       if (tableData.orderId) {
-        // Solo quitar el orderId de la mesa sin eliminar la orden
-        await setDoc(
-          tableRef,
-          { status: 'disponible', orderId: null, orderItems: [] },
-          { merge: true }
-        );
+        await setDoc(tableRef, { status: 'disponible', orderId: null, orderItems: [] }, { merge: true });
       }
     }
   };
@@ -172,11 +163,14 @@ export const WaiterProvider: React.FC<WaiterProviderProps> = ({ children }) => {
         orders,
         selectTable,
         createOrder,
-        getOrders,
         addOrderItem,
         updateOrderStatus,
         loadTables,
-        freeTable, // Se expone la función freeTable
+        freeTable,
+        showPopup,
+        orderForPopup,
+        setShowPopup,
+        getOrders, // Agregado getOrders
       }}
     >
       {children}
