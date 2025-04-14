@@ -19,6 +19,9 @@ import { OrderItem } from '../interfaces/OrderItem';
 import { MenuItem } from '@/interfaces/MenuItem';
 import { Table } from '@/interfaces/Table';
 
+// Importación de expo-camera según SDK 52
+import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
+
 export default function WaiterScreen() {
   const { user } = useAuth();
   const router = useRouter();
@@ -190,6 +193,46 @@ export default function WaiterScreen() {
       <TouchableOpacity style={styles.orderButton} onPress={() => setShowOrderModal(true)}>
         <Text style={styles.orderButtonText}>View Order</Text>
       </TouchableOpacity>
+
+      {/* Popup de la orden lista */}
+      <Modal visible={showPopup} animationType="slide">
+        <View style={styles.modalContainer}>
+          <Text style={styles.modalTitle}>¡Pedido Listo!</Text>
+          {orderForPopup && (
+            <>
+              <Text>Orden ID: {orderForPopup.id}</Text>
+              <Text>Total: ${orderForPopup.total}</Text>
+            </>
+          )}
+          <Button title="Cerrar" onPress={() => setShowPopup(false)} />
+        </View>
+      </Modal>
+
+      <TouchableOpacity style={styles.qrButton} onPress={handleOpenQRScanner}>
+        <Text style={styles.qrButtonText}>Scan QR Code</Text>
+      </TouchableOpacity>
+
+      {/* Modal para escanear QR utilizando expo-camera */}
+      <Modal visible={showQRScanner} animationType="slide">
+        <View style={styles.modalContainer}>
+          <Text style={styles.modalTitle}>Scan QR Code</Text>
+          {(!permission || !permission.granted) ? (
+            <View style={styles.permissionContainer}>
+              <Text style={styles.modalText}>Solicitando permiso para la cámara...</Text>
+              <Button onPress={requestPermission} title="Grant permission" />
+            </View>
+          ) : (
+            <CameraView 
+              style={styles.camera}
+              facing={cameraFacing}
+              onBarcodeScanned={handleBarCodeScanned}
+            />
+          )}
+          <TouchableOpacity style={styles.closeModalButton} onPress={() => setShowQRScanner(false)}>
+            <Text style={styles.closeModalText}>Close Scanner</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
 
       {/* Modal para seleccionar platos del menú */}
       <Modal visible={showMenuModal} animationType="slide">
