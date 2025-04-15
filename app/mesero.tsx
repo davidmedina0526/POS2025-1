@@ -8,8 +8,7 @@ import {
   FlatList, 
   TextInput, 
   Alert,
-  Image,
-  Button
+  Image
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { useRouter } from 'expo-router';
@@ -22,8 +21,13 @@ import { Table } from '@/interfaces/Table';
 // Importación de expo-camera según SDK 52
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 
+// Importar funciones de Firestore para la suscripción en tiempo real
+import { collection, onSnapshot } from "firebase/firestore";
+import { db } from '../utils/FireBaseConfig';
+import CustomButton from '@/components/CustomButton';
+
 export default function WaiterScreen() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
 
@@ -32,12 +36,12 @@ export default function WaiterScreen() {
     selectTable,
     selectedTable,
     createOrder,
-    loadTables,
     addOrderItem,
     freeTable, // Función para liberar la mesa
     showPopup,
     orderForPopup,
     setShowPopup,
+    loadTables, // Función definida en WaiterContext para cargar las mesas
   } = useWaiterContext();
 
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
@@ -53,14 +57,24 @@ export default function WaiterScreen() {
 
   const { menuItems, getMenuItems } = useMenu();
 
-  // Se reemplaza la solicitud de permiso utilizando expo-camera
+  // Permisos y configuración de la cámara usando expo-camera
   const [permission, requestPermission] = useCameraPermissions();
   const [cameraFacing, setCameraFacing] = useState<CameraType>('back');
 
   useEffect(() => {
     setMounted(true);
-    loadTables();
+    // Cargar los items del menú (consulta única)
     getMenuItems();
+
+    // Configurar la suscripción en tiempo real a la colección "tables".
+    // Cada vez que se detecte un cambio, se ejecuta loadTables para actualizar el estado.
+    const unsubscribe = onSnapshot(collection(db, "tables"), (snapshot) => {
+      loadTables();
+      console.log("Changes in the tables have been detected.");
+    });
+
+    // Limpieza de la suscripción al desmontar
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -69,32 +83,34 @@ export default function WaiterScreen() {
     }
   }, [user, mounted]);
 
-  // Maneja el escaneo del QR usando expo-camera
+  // Manejo del escaneo del QR usando expo-camera
   const handleBarCodeScanned = ({ type, data }: { type: string; data: string }) => {
     setShowQRScanner(false);
-    // Se espera que el QR contenga un identificador de mesa con el formato "table_X"
-    if (data.startsWith('table')) {
-      const tableId = data; // 'table_X'
-      selectTable(tableId);  // Selecciona la mesa al escanear
+    // Se espera que el QR contenga un identificador de mesa (por ejemplo, "table_X")
+    if (/^\d+$/.test(data)) {
+      const tableId = data;
+      selectTable(tableId);
       setShowMenuModal(true);
-      setSelectedCategory(null); // Resetea la categoría seleccionada
+      setSelectedCategory(null);
     } else {
-      Alert.alert('QR inválido', 'El código QR escaneado no es válido para una mesa.');
+      Alert.alert('Invalid QR code', 'The QR code must be valid for a table.');
     }
   };
 
-  // Modifica el renderizado para abrir el escáner QR
+  // Manejador para abrir el escáner QR
   const handleOpenQRScanner = () => {
-    setShowQRScanner(true); // Muestra el modal del escáner QR
+    setShowQRScanner(true);
   };
 
+  // Selección de una mesa
   const handleSelectTable = (table: Table) => {
     if (table.status === 'disponible') {
       selectTable(table.id);
       setShowMenuModal(true);
       setSelectedCategory(null);
     } else {
-      Alert.alert('Mesa ocupada', 'Esta mesa ya tiene una orden asignada.');
+      Alert.alert(`Table ${table.id} occupied`, 'This table is currently occupied. Please try again later.');
+      // Si la mesa está ocupada, se cargan los ítems de la orden actual.
       const currentOrderItems = tables.find(item => item.id === table.id)?.orderItems;
       if (currentOrderItems) {
         setOrderItems(currentOrderItems);
@@ -102,14 +118,14 @@ export default function WaiterScreen() {
     }
   };
 
-  // Manejador para liberar la mesa y borrar la orden asociada
+  // Libera la mesa y borra la orden asociada
   const handleFreeTable = async (tableId: string) => {
     try {
       await freeTable(tableId);
-      Alert.alert('Mesa liberada', 'La mesa se ha liberado y la orden se ha borrado.');
+      Alert.alert(`Table ${tableId} liberated!`, `You may now create a new order for this table.`);
     } catch (error) {
-      console.error('Error al liberar la mesa:', error);
-      Alert.alert('Error', 'No se pudo liberar la mesa.');
+      console.error('Error liberating table:', error);
+      Alert.alert('Error', 'Table could not be liberated');
     }
   };
 
@@ -118,21 +134,26 @@ export default function WaiterScreen() {
     setQuantity('1');
   };
 
-  const addItemToOrder = () => {
+  // Función para añadir ítems a la orden.
+  // Si la mesa ya tiene un orderId, se utiliza ese para agregar el ítem adicional.
+  const addItemToOrder = async () => {
     if (!selectedMenuItem) return;
-
     const parsedQuantity = parseInt(quantity);
     if (isNaN(parsedQuantity) || parsedQuantity <= 0) {
-      Alert.alert('Cantidad inválida', 'Ingresa una cantidad mayor a 0');
+      Alert.alert('Invalid amount', 'Please enter an amount greater than 0.');
       return;
     }
-
-    const index = orderItems.findIndex(item => item.menuItemId === selectedMenuItem.id);
-    if (index > -1) {
-      const updatedItems = [...orderItems];
-      updatedItems[index].quantity += parsedQuantity;
+    // Buscar si ya existe el ítem en la orden actual.
+    const existingIndex = orderItems.findIndex(item => item.menuItemId === selectedMenuItem.id);
+    let updatedItems: OrderItem[];
+    if (existingIndex > -1) {
+      updatedItems = [...orderItems];
+      updatedItems[existingIndex].quantity += parsedQuantity;
       setOrderItems(updatedItems);
-      addOrderItem(selectedTable?.id || '', updatedItems[index]);
+      // Si la mesa tiene un pedido activo, usamos su orderId para agregar el ítem extra.
+      if (selectedTable?.orderId) {
+        await addOrderItem(selectedTable.orderId, updatedItems[existingIndex]);
+      }
     } else {
       const newItem: OrderItem = {
         menuItemId: selectedMenuItem.id,
@@ -140,9 +161,13 @@ export default function WaiterScreen() {
         quantity: parsedQuantity,
         price: selectedMenuItem.price,
       };
-      setOrderItems(prev => [...prev, newItem]);
-      addOrderItem(selectedTable?.id || '', newItem);
+      updatedItems = [...orderItems, newItem];
+      setOrderItems(updatedItems);
+      if (selectedTable?.orderId) {
+        await addOrderItem(selectedTable.orderId, newItem);
+      }
     }
+    Alert.alert("Item added!", "The item has been added successfully.");
     setSelectedMenuItem(null);
     setQuantity('1');
   };
@@ -150,7 +175,7 @@ export default function WaiterScreen() {
   const sendOrder = async () => {
     if (!selectedTable) return;
     await createOrder(selectedTable.id, orderItems);
-    Alert.alert('Orden enviada', 'La orden se ha enviado a la cocina');
+    Alert.alert('Order created!', 'The order has been sent to the kitchen successfully.');
     setOrderItems([]);
     setShowOrderModal(false);
     selectTable('');
@@ -165,7 +190,11 @@ export default function WaiterScreen() {
       <Text style={styles.title}>Welcome, waiter!</Text>
 
       {/* Botón para activar el escáner QR */}
-      <TouchableOpacity style={styles.qrButton} onPress={() => setShowQRScanner(true)}>
+      <TouchableOpacity style={styles.qrButton} onPress={handleOpenQRScanner}>
+        <Image 
+          source={require('../assets/images/codigo-qr.png')}
+          style={{ width: 25, height: 25, marginRight: 10 }}
+        />
         <Text style={styles.qrButtonText}>Scan QR Code</Text>
       </TouchableOpacity>
 
@@ -190,46 +219,62 @@ export default function WaiterScreen() {
         )}
       />
 
-      <TouchableOpacity style={styles.orderButton} onPress={() => setShowOrderModal(true)}>
-        <Text style={styles.orderButtonText}>View Order</Text>
-      </TouchableOpacity>
+      <View style={styles.buttonsContainer}>
+        <TouchableOpacity style={styles.orderButton} onPress={() => setShowOrderModal(true)}>
+          <Text style={styles.orderButtonText}>View Order</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.buttonsContainer}>
+        {/* Modal para escanear QR utilizando expo-camera */}
+        <Modal visible={showQRScanner} animationType="slide">
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Scan QR Code</Text>
+            {(!permission || !permission.granted) ? (
+              <View style={styles.permissionContainer}>
+                <Text style={styles.modalText}>Requesting permission for the camera...</Text>
+                <CustomButton onPress={requestPermission} title="Grant permission" />
+              </View>
+            ) : (
+              <CameraView 
+                style={styles.camera}
+                facing={cameraFacing}
+                onBarcodeScanned={handleBarCodeScanned}
+              />
+            )}
+            <TouchableOpacity style={styles.closeModalButton} onPress={() => setShowQRScanner(false)}>
+              <Text style={styles.closeModalText}>Close Scanner</Text>
+            </TouchableOpacity>
+          </View>
+        </Modal>
+        {/* Botón de Logout */}
+        <TouchableOpacity
+          style={styles.logoutButton}
+          onPress={() => {
+            logout();
+            router.replace('./');
+          }}
+        >
+          <Image 
+            source={require('../assets/images/salir.png')}
+            style={{ width: 25, height: 25, marginRight: 10 }}
+          />
+          <Text style={styles.logoutButtonText}>Log Out</Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Popup de la orden lista */}
       <Modal visible={showPopup} animationType="slide">
         <View style={styles.modalContainer}>
-          <Text style={styles.modalTitle}>¡Pedido Listo!</Text>
+          <Text style={styles.orderReadyTitle}>Order Ready!</Text>
           {orderForPopup && (
             <>
-              <Text>Orden ID: {orderForPopup.id}</Text>
-              <Text>Total: ${orderForPopup.total}</Text>
+              <Text style={styles.orderReadyText}>Order ID: {orderForPopup.id}</Text>
+              <Text style={styles.orderReadyText}>Total: ${orderForPopup.total}</Text>
             </>
           )}
-          <Button title="Cerrar" onPress={() => setShowPopup(false)} />
-        </View>
-      </Modal>
-
-      <TouchableOpacity style={styles.qrButton} onPress={handleOpenQRScanner}>
-        <Text style={styles.qrButtonText}>Scan QR Code</Text>
-      </TouchableOpacity>
-
-      {/* Modal para escanear QR utilizando expo-camera */}
-      <Modal visible={showQRScanner} animationType="slide">
-        <View style={styles.modalContainer}>
-          <Text style={styles.modalTitle}>Scan QR Code</Text>
-          {(!permission || !permission.granted) ? (
-            <View style={styles.permissionContainer}>
-              <Text style={styles.modalText}>Solicitando permiso para la cámara...</Text>
-              <Button onPress={requestPermission} title="Grant permission" />
-            </View>
-          ) : (
-            <CameraView 
-              style={styles.camera}
-              facing={cameraFacing}
-              onBarcodeScanned={handleBarCodeScanned}
-            />
-          )}
-          <TouchableOpacity style={styles.closeModalButton} onPress={() => setShowQRScanner(false)}>
-            <Text style={styles.closeModalText}>Close Scanner</Text>
+          <TouchableOpacity style={styles.orderReadyCloseButton} onPress={() => setShowPopup(false)}>
+            <Text style={styles.orderReadyCloseButtonText}>Close</Text>
           </TouchableOpacity>
         </View>
       </Modal>
@@ -238,7 +283,6 @@ export default function WaiterScreen() {
       <Modal visible={showMenuModal} animationType="slide">
         <View style={styles.modalContainer}>
           <Text style={styles.modalTitle}>Menu</Text>
-          {/* Muestra la mesa en la que se realiza la orden */}
           {selectedTable && (
             <Text style={styles.orderTableInfo}>Table {selectedTable.id}</Text>
           )}
@@ -281,8 +325,17 @@ export default function WaiterScreen() {
                 keyExtractor={(item) => item.id}
                 renderItem={({ item }) => (
                   <TouchableOpacity style={styles.menuItem} onPress={() => handleSelectMenuItem(item)}>
-                    <Text style={styles.menuItemText}>{item.name}</Text>
-                    <Text style={styles.menuItemText}>${item.price}</Text>
+                    <View style={styles.menuItemInfo}>
+                      <View style={styles.menuItemTextContainer}>
+                        <Text style={styles.menuItemText}>{item.name}</Text>
+                        <Text style={styles.menuItemPrice}>${item.price}</Text>
+                        <Text style={styles.menuItemDescription}>{item.description}</Text>
+                      </View>
+                      <Image 
+                        source={{ uri: item.imageUrl }}
+                        style={styles.menuItemImage}
+                      />
+                    </View>
                   </TouchableOpacity>
                 )}
               />
@@ -316,7 +369,6 @@ export default function WaiterScreen() {
       <Modal visible={showOrderModal} animationType="slide">
         <View style={styles.modalContainer}>
           <Text style={styles.modalTitle}>Customer Order</Text>
-          {/* Muestra la mesa para la orden en el modal de orden */}
           {selectedTable && (
             <Text style={styles.orderTableInfo}>Table {selectedTable.id}</Text>
           )}
@@ -349,7 +401,7 @@ export default function WaiterScreen() {
             <Text style={styles.sendOrderButtonText}>Send Order</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.closeModalButton} onPress={() => setShowOrderModal(false)}>
-            <Text>Close Order</Text>
+            <Text style={styles.closeModalText}>Go Back</Text>
           </TouchableOpacity>
         </View>
       </Modal>
@@ -367,9 +419,20 @@ const styles = StyleSheet.create({
     color: '#347FC2',
     fontSize: 24, 
     fontWeight: 'bold',
-    marginTop: 20,
-    marginBottom: 50,
+    marginTop: 25,
+    marginBottom: 30,
     textAlign: 'center',
+  },
+  orderButton: {
+    backgroundColor: '#347FC2',
+    padding: 10,
+    borderRadius: 5,
+    marginTop: 30,
+  },
+  orderButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#FFF',
   },
   qrButton: {
     backgroundColor: '#347FC2',
@@ -377,10 +440,32 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     alignSelf: 'center',
     marginBottom: 20,
+    display: 'flex',
+    flexDirection: 'row',
   },
   qrButtonText: {
-    color: '#FFF',
+    fontSize: 16,
     fontWeight: 'bold',
+    color: '#FFF',
+  },
+  logoutButton: {
+    backgroundColor: '#DD1616',
+    borderRadius: 5,
+    marginTop: 15,
+    padding: 10,
+    display: 'flex',
+    flexDirection: 'row',
+  },
+  logoutButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#FFF',
+  },
+  buttonsContainer: {
+    display: 'flex',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    marginBottom: 10,
   },
   table: {
     padding: 15,
@@ -402,19 +487,6 @@ const styles = StyleSheet.create({
     padding: 5,
     alignSelf: 'center',
   },
-  orderButton: {
-    position: 'absolute',
-    top: 55,
-    right: 20,
-    backgroundColor: '#347FC2',
-    padding: 10,
-    borderRadius: 5,
-    marginTop: 30,
-  },
-  orderButtonText: {
-    color: '#FFF',
-    fontWeight: 'bold',
-  },
   modalContainer: {
     flex: 1,
     padding: 20,
@@ -426,6 +498,31 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     marginTop: 30,
     textAlign: 'center',
+  },
+  orderReadyTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: '10%',
+    marginTop: 30,
+    textAlign: 'center',
+  },
+  orderReadyText: {
+    fontSize: 18,
+  },
+  orderReadyCloseButton: {
+    backgroundColor: '#347FC2', 
+    padding: 15, 
+    borderRadius: 10, 
+    width: '40%', 
+    alignItems: 'center', 
+    alignSelf: 'center',
+    marginTop: '10%',
+    marginBottom: '3%' 
+  },
+  orderReadyCloseButtonText: {
+    color: '#FFF', 
+    fontSize: 18, 
+    fontWeight: 'bold',
   },
   orderTableInfo: {
     fontSize: 16,
@@ -474,8 +571,33 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: '#EEE',
   },
+  menuItemInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  menuItemTextContainer: {
+    flex: 1,
+    paddingRight: 10,
+  },
   menuItemText: {
-    fontSize: 15,
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  menuItemPrice: {
+    fontSize: 16,
+    color: '#347FC2',
+    marginTop: 2,
+  },
+  menuItemDescription: {
+    fontSize: 14,
+    color: '#555',
+    marginTop: 4,
+  },
+  menuItemImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 5,
   },
   quantityContainer: {
     marginVertical: 20,
@@ -524,6 +646,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   deleteText: {
+    fontWeight: 'bold',
     color: 'red',
     marginLeft: 10,
   },
@@ -535,10 +658,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sendOrderButtonText: {
-    color: '#FFF',
+    fontSize: 17,
     fontWeight: 'bold',
+    color: '#FFF',
   },
-  // Nuevo estilo para la vista de la cámara dentro del modal QR
   camera: {
     flex: 1,
     borderRadius: 10,
@@ -549,7 +672,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   modalText: {
-    fontSize: 18,
+    fontSize: 20,
     textAlign: 'center',
     marginBottom: 10,
   },
