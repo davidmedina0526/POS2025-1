@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { db } from '../utils/FireBaseConfig';
 import { collection, getDocs, addDoc, doc, deleteDoc, Timestamp, getDoc } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
-import { Order } from '../interfaces/Order'; // Asegúrate de importar también OrderItem
+import { Order } from '../interfaces/Order';
 
 export default function CajaScreen() {
   const { user, logout } = useAuth();
@@ -17,9 +17,11 @@ export default function CajaScreen() {
     try {
       const querySnapshot = await getDocs(collection(db, 'orders'));
       const ordersData: Order[] = [];
+
       querySnapshot.forEach((docSnapshot) => {
         const data = docSnapshot.data();
         if (data.status === 'listo') {
+          // Asegurémonos de que todas las propiedades de la orden se asignen correctamente
           const order: Order = {
             id: docSnapshot.id,
             tableId: data.tableId,
@@ -31,6 +33,7 @@ export default function CajaScreen() {
           ordersData.push(order);
         }
       });
+
       setOrders(ordersData);
     } catch (error) {
       console.error('Error loading orders: ', error);
@@ -60,7 +63,7 @@ export default function CajaScreen() {
       loadOrders();
 
       // Mostrar mensaje de confirmación
-      Alert.alert("Payment successful!", `Order ${orderId} has been payed and logged in the database correctly.`);
+      Alert.alert("¡Pago exitoso!", `La orden ${orderId} ha sido pagada y registrada correctamente.`);
     }
   };
 
@@ -78,35 +81,40 @@ export default function CajaScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Welcome, cashier!</Text>
+      <Text style={styles.title}>Órdenes para pagar</Text>
       <FlatList
         data={orders}
         renderItem={({ item }) => (
           <View style={styles.orderCard}>
-            <Text>Order ID: {item.id}</Text>
+            <Text>Orden ID: {item.id}</Text>
             <Text>Total: ${item.total}</Text>
-            {/* Mostrar los ítems de la orden */}
-            <Text style={styles.itemsTitle}>Order Items:</Text>
+
+            <Text style={styles.itemsTitle}>Platos:</Text>
             <FlatList
               data={item.items}
               renderItem={({ item: orderItem }) => (
                 <View style={styles.itemCard}>
-                  <Text>Item: {orderItem.name}</Text>
-                  <Text>Amount: {orderItem.quantity}</Text>
-                  <Text>Price: ${orderItem.price}</Text>
+                  <Text>Plato: {orderItem.name}</Text>
+                  <Text>Cantidad: {orderItem.quantity}</Text>
+                  <Text>Precio: ${orderItem.price}</Text>
                 </View>
               )}
               keyExtractor={(item, index) => `${item.menuItemId}-${index}`}
             />
-            <TouchableOpacity style={styles.payButton} onPress={async () => {
-              await moveToCompleteOrders(item.id);
-            }}>
-              <Text style={styles.payButtonText}>Pay</Text>
+
+            <TouchableOpacity
+              style={styles.payButton}
+              onPress={async () => {
+                await moveToCompleteOrders(item.id);
+              }}
+            >
+              <Text style={styles.payButtonText}>Pagar</Text>
             </TouchableOpacity>
           </View>
         )}
         keyExtractor={(item) => item.id}
       />
+
       <TouchableOpacity
         style={styles.logoutButton}
         onPress={() => {
@@ -118,7 +126,7 @@ export default function CajaScreen() {
           source={require('../assets/images/salir.png')}
           style={{ width: 25, height: 25, marginRight: 10 }}
         />
-        <Text style={styles.logoutButtonText}>Log Out</Text>
+        <Text style={styles.logoutButtonText}>Cerrar sesión</Text>
       </TouchableOpacity>
     </View>
   );
@@ -180,6 +188,7 @@ const styles = StyleSheet.create({
     padding: 10,
     display: 'flex',
     flexDirection: 'row',
+    alignItems: 'center'
   },
   logoutButtonText: {
     fontSize: 16,
