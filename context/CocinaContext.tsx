@@ -1,11 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { db } from '../utils/FireBaseConfig';
-import { collection, doc, getDocs, updateDoc, Timestamp } from 'firebase/firestore';
+import { collection, doc, updateDoc, onSnapshot, Timestamp } from 'firebase/firestore';
 import { Order } from '../interfaces/Order';
 
 interface CookContextType {
   orders: Order[];
-  loadOrders: () => void;
+  loadOrders: () => void; // Disponible si se quiere forzar carga manual
   updateOrderStatus: (orderId: string, status: 'pendiente' | 'en preparación' | 'listo' | 'cancelado') => void;
   calculateTimeSinceOrder: (createdAt: Timestamp) => number;
 }
@@ -23,14 +23,36 @@ export const useCookContext = () => {
 export const CookProvider = ({ children }: { children: React.ReactNode }) => {
   const [orders, setOrders] = useState<Order[]>([]);
 
-  // Cargar órdenes desde Firestore (ordenes pendientes o en preparación)
-  const loadOrders = async () => {
-    try {
-      const querySnapshot = await getDocs(collection(db, 'orders'));
+  // Función para carga manual (si se quiere usar desde otro componente)
+  const loadOrders = () => {
+    // Intencionalmente vacía porque usamos onSnapshot (tiempo real)
+  };
+
+  // Actualizar el estado de una orden
+  const updateOrderStatus = async (
+    orderId: string,
+    status: 'pendiente' | 'en preparación' | 'listo' | 'cancelado'
+  ) => {
+    const orderRef = doc(db, 'orders', orderId);
+    await updateDoc(orderRef, { status });
+    // No necesitamos llamar loadOrders porque la suscripción ya lo actualizará
+  };
+
+  // Calcular tiempo desde que se creó la orden
+  const calculateTimeSinceOrder = (orderTimestamp: Timestamp): number => {
+    const now = Timestamp.now();
+    return now.seconds - orderTimestamp.seconds;
+  };
+
+  // Suscripción en tiempo real a Firestore
+  useEffect(() => {
+    const ordersCollection = collection(db, 'orders');
+    const unsubscribe = onSnapshot(ordersCollection, (snapshot) => {
       const ordersData: Order[] = [];
-      querySnapshot.forEach((docSnapshot) => {
+
+      snapshot.forEach((docSnapshot) => {
         const data = docSnapshot.data();
-        // Asegúrate de que todos los campos necesarios estén presentes
+        // Solo cargar órdenes activas
         if (data.status === 'pendiente' || data.status === 'en preparación') {
           const order: Order = {
             id: docSnapshot.id,
@@ -43,34 +65,23 @@ export const CookProvider = ({ children }: { children: React.ReactNode }) => {
           ordersData.push(order);
         }
       });
+
       setOrders(ordersData);
-    } catch (error) {
-      console.error('Error al cargar las órdenes: ', error);
-    }
-  };
+    });
 
-  // Actualizar estado de la orden
-  const updateOrderStatus = async (orderId: string, status: 'pendiente' | 'en preparación' | 'listo' | 'cancelado') => {
-    const orderRef = doc(db, 'orders', orderId);
-    await updateDoc(orderRef, { status });
-
-    // Actualizar la lista de órdenes
-    loadOrders();
-  };
-
-  // Calcular el tiempo transcurrido desde que se realizó la orden
-  const calculateTimeSinceOrder = (orderTimestamp: Timestamp): number => {
-    const currentTimestamp = Timestamp.now();
-    const differenceInMilliseconds = currentTimestamp.seconds - orderTimestamp.seconds;
-    return differenceInMilliseconds; 
-  };
-
-  useEffect(() => {
-    loadOrders();
+    // Limpiar suscripción al desmontar
+    return () => unsubscribe();
   }, []);
 
   return (
-    <CookContext.Provider value={{ orders, loadOrders, updateOrderStatus, calculateTimeSinceOrder }}>
+    <CookContext.Provider
+      value={{
+        orders,
+        loadOrders,
+        updateOrderStatus,
+        calculateTimeSinceOrder,
+      }}
+    >
       {children}
     </CookContext.Provider>
   );

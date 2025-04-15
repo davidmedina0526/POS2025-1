@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Button, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, Image, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { db } from '../utils/FireBaseConfig';
 import { collection, getDocs, addDoc, doc, deleteDoc, Timestamp, getDoc } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
-import { Order, OrderItem } from '../interfaces/Order'; // Asegúrate de importar también OrderItem
+import { Order } from '../interfaces/Order';
 
 export default function CajaScreen() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -17,24 +17,26 @@ export default function CajaScreen() {
     try {
       const querySnapshot = await getDocs(collection(db, 'orders'));
       const ordersData: Order[] = [];
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
+
+      querySnapshot.forEach((docSnapshot) => {
+        const data = docSnapshot.data();
         if (data.status === 'listo') {
           // Asegurémonos de que todas las propiedades de la orden se asignen correctamente
           const order: Order = {
-            id: doc.id, // El id de la orden
-            tableId: data.tableId, // ID de la mesa
-            items: data.items, // Los elementos de la orden
-            total: data.total, // Total de la orden
-            status: data.status, // Estado de la orden
-            createdAt: data.createdAt, // Fecha de creación
+            id: docSnapshot.id,
+            tableId: data.tableId,
+            items: data.items,
+            total: data.total,
+            status: data.status,
+            createdAt: data.createdAt,
           };
           ordersData.push(order);
         }
       });
+
       setOrders(ordersData);
     } catch (error) {
-      console.error('Error al cargar las órdenes: ', error);
+      console.error('Error loading orders: ', error);
     } finally {
       setLoading(false);
     }
@@ -58,7 +60,10 @@ export default function CajaScreen() {
       await deleteDoc(orderRef);
 
       // Actualizar el estado de las órdenes
-      loadOrders(); // Refrescar las órdenes
+      loadOrders();
+
+      // Mostrar mensaje de confirmación
+      Alert.alert("¡Pago exitoso!", `La orden ${orderId} ha sido pagada y registrada correctamente.`);
     }
   };
 
@@ -76,15 +81,15 @@ export default function CajaScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Pantalla de Caja</Text>
+      <Text style={styles.title}>Órdenes para pagar</Text>
       <FlatList
         data={orders}
         renderItem={({ item }) => (
           <View style={styles.orderCard}>
             <Text>Orden ID: {item.id}</Text>
             <Text>Total: ${item.total}</Text>
-            {/* Aquí mostramos los ítems de la orden */}
-            <Text style={styles.itemsTitle}>Ítems de la Orden:</Text>
+
+            <Text style={styles.itemsTitle}>Platos:</Text>
             <FlatList
               data={item.items}
               renderItem={({ item: orderItem }) => (
@@ -96,11 +101,33 @@ export default function CajaScreen() {
               )}
               keyExtractor={(item, index) => `${item.menuItemId}-${index}`}
             />
-            <Button title="Pagar" onPress={() => moveToCompleteOrders(item.id)} />
+
+            <TouchableOpacity
+              style={styles.payButton}
+              onPress={async () => {
+                await moveToCompleteOrders(item.id);
+              }}
+            >
+              <Text style={styles.payButtonText}>Pagar</Text>
+            </TouchableOpacity>
           </View>
         )}
         keyExtractor={(item) => item.id}
       />
+
+      <TouchableOpacity
+        style={styles.logoutButton}
+        onPress={() => {
+          logout();
+          router.replace('./');
+        }}
+      >
+        <Image 
+          source={require('../assets/images/salir.png')}
+          style={{ width: 25, height: 25, marginRight: 10 }}
+        />
+        <Text style={styles.logoutButtonText}>Cerrar sesión</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -116,14 +143,17 @@ const styles = StyleSheet.create({
     color: '#347FC2',
     fontSize: 24, 
     fontWeight: 'bold',
-    marginBottom: 20,
+    marginTop: 25,
+    marginBottom: 30,
   },
   orderCard: {
     padding: 10,
-    marginBottom: 15,
+    marginBottom: 60,
     borderWidth: 1,
     borderColor: '#ccc',
     borderRadius: 5,
+    alignSelf: 'center',
+    width: '90%',
   },
   itemsTitle: {
     marginTop: 10,
@@ -136,5 +166,33 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 5,
+  },
+  payButton: {
+    backgroundColor: '#347FC2',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 5,
+    marginTop: 10,
+    alignItems: 'center'
+  },
+  payButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#FFF'
+  },
+  logoutButton: {
+    backgroundColor: '#DD1616',
+    borderRadius: 5,
+    marginTop: 15,
+    marginBottom: 15,
+    padding: 10,
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center'
+  },
+  logoutButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#FFF',
   },
 });
