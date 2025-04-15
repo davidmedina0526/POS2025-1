@@ -63,7 +63,7 @@ export default function CajaScreen() {
       loadOrders();
 
       // Mostrar mensaje de confirmación
-      Alert.alert("¡Pago exitoso!", `La orden ${orderId} ha sido pagada y registrada correctamente.`);
+      Alert.alert("Payment successful!", `Order ${orderId} has been paid and logged correctly.`);
     }
   };
 
@@ -81,22 +81,22 @@ export default function CajaScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Órdenes para pagar</Text>
+      <Text style={styles.title}>Welcome, cashier!</Text>
       <FlatList
         data={orders}
         renderItem={({ item }) => (
           <View style={styles.orderCard}>
-            <Text>Orden ID: {item.id}</Text>
+            <Text>Order ID: {item.id}</Text>
             <Text>Total: ${item.total}</Text>
 
-            <Text style={styles.itemsTitle}>Platos:</Text>
+            <Text style={styles.itemsTitle}>Order Items:</Text>
             <FlatList
               data={item.items}
               renderItem={({ item: orderItem }) => (
                 <View style={styles.itemCard}>
-                  <Text>Plato: {orderItem.name}</Text>
-                  <Text>Cantidad: {orderItem.quantity}</Text>
-                  <Text>Precio: ${orderItem.price}</Text>
+                  <Text>Item: {orderItem.name}</Text>
+                  <Text>Amount: {orderItem.quantity}</Text>
+                  <Text>Price: ${orderItem.price}</Text>
                 </View>
               )}
               keyExtractor={(item, index) => `${item.menuItemId}-${index}`}
@@ -108,7 +108,7 @@ export default function CajaScreen() {
                 await moveToCompleteOrders(item.id);
               }}
             >
-              <Text style={styles.payButtonText}>Pagar</Text>
+              <Text style={styles.payButtonText}>Pay</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -126,7 +126,7 @@ export default function CajaScreen() {
           source={require('../assets/images/salir.png')}
           style={{ width: 25, height: 25, marginRight: 10 }}
         />
-        <Text style={styles.logoutButtonText}>Cerrar sesión</Text>
+        <Text style={styles.logoutButtonText}>Log Out</Text>
       </TouchableOpacity>
     </View>
   );

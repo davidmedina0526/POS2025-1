@@ -35,7 +35,7 @@ export default function CookScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Órdenes en Cocina</Text>
+      <Text style={styles.title}>Welcome to the kitchen!</Text>
 
       <FlatList
         data={orders}
@@ -46,10 +46,10 @@ export default function CookScreen() {
 
           return (
             <View style={styles.orderCard}>
-              <Text style={styles.orderText}>Orden ID: {item.id}</Text>
-              <Text style={styles.orderText}>Estado: {item.status}</Text>
+              <Text style={styles.orderText}>Order ID: {item.id}</Text>
+              <Text style={styles.orderText}>Status: {item.status}</Text>
               
-              <Text style={styles.itemsTitle}>Platos:</Text>
+              <Text style={styles.itemsTitle}>Order Items:</Text>
               {item.items.map((orderItem, index) => (
                 <Text key={index} style={styles.itemText}>
                   {orderItem.quantity}x {orderItem.name}
@@ -62,7 +62,7 @@ export default function CookScreen() {
                   { color: isRed ? 'red' : 'black' },
                 ]}
               >
-                Tiempo en cocina: {timeInSeconds} seg
+                Time in queue: {timeInSeconds} seconds
               </Text>
 
               {item.status === 'pendiente' && (
@@ -72,7 +72,7 @@ export default function CookScreen() {
                     await updateOrderStatus(item.id, 'en preparación');
                   }}
                 >
-                  <Text style={styles.orderButtonText}>Empezar preparación</Text>
+                  <Text style={styles.orderButtonText}>Begin Preparing</Text>
                 </TouchableOpacity>
               )}
               {item.status === 'en preparación' && (
@@ -80,10 +80,10 @@ export default function CookScreen() {
                   style={styles.orderButton}
                   onPress={async () => {
                     await updateOrderStatus(item.id, 'listo');
-                    Alert.alert(`Orden ${item.id} marcada como lista`, "El mesero ha sido notificado.");
+                    Alert.alert(`Order ${item.id} ready!`, "The waiter has been notified.");
                   }}
                 >
-                  <Text style={styles.orderButtonText}>Marcar como Hecho</Text>
+                  <Text style={styles.orderButtonText}>Mark as Ready</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -102,7 +102,7 @@ export default function CookScreen() {
           source={require('../assets/images/salir.png')}
           style={{ width: 25, height: 25, marginRight: 10 }}
         />
-        <Text style={styles.logoutButtonText}>Cerrar sesión</Text>
+        <Text style={styles.logoutButtonText}>Log Out</Text>
       </TouchableOpacity>
     </View>
   );
